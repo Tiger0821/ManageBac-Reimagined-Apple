@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ManageBac Reimagined (Apple)
 // @namespace    https://github.com/Tiger0821/ManageBac-Reimagined-Apple
-// @version      2026.10.01.2
+// @version      2026.10.01.3
 // @description  ManageBac restyled after apple.com, with a three-tab switcher, a ⌘K class palette, today's timetable in a side dock with a living aquarium, and what's due today on the calendar.
 // @author       Arstoien, Tiger0821
 // @homepageURL  https://github.com/Tiger0821/ManageBac-Reimagined-Apple
@@ -702,17 +702,21 @@ html.mbs-docked.mbs-dock-loose body { padding-left:var(--dock) !important; }
    from Plex Mono, and they sit smaller and lighter than Latin ones at a size */
 .mbs-tt__wk { flex:none; width:18px; display:flex; align-items:center; justify-content:center;
   font-size:12px; color:var(--ink3); }
-.mbs-tt__day { flex:1 0 0; min-width:0; appearance:none; border:0; border-radius:var(--pill);
-  background:transparent; cursor:pointer; padding:6px 2px; position:relative; z-index:0;
-  display:flex; align-items:baseline; justify-content:center; gap:4px;
-  font-size:11px; color:var(--ink3); transition:background .2s ease; }
-.mbs-tt__day b { font-size:13px; font-weight:500; color:var(--ink); }
-.mbs-tt__day:hover { background:rgba(0,0,0,.04); }
-.mbs-tt__day[aria-current="true"] { background:var(--ink); }
-.mbs-tt__day[aria-current="true"] b { color:#fff; font-weight:600; }
-.mbs-tt__day.is-today b { color:var(--a); font-weight:600; }
-.mbs-tt__day.is-today[aria-current="true"] { background:var(--a); }
-.mbs-tt__day.is-today[aria-current="true"] b { color:#fff; }
+/* The day picker after Calendar on the iPhone: the cell stays bare and the
+   mark sits on the number itself — today in highlighter yellow, the day
+   you've picked in a small dark circle. Picking today keeps it yellow and
+   rings it, so it reads as both. */
+.mbs-tt__day { flex:1 0 0; min-width:0; appearance:none; border:0; background:transparent; cursor:pointer;
+  padding:3px 0; display:flex; align-items:center; justify-content:center; }
+.mbs-tt__day b { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box;
+  min-width:28px; height:28px; padding:0 7px; border-radius:980px;
+  font-size:13px; font-weight:500; color:var(--ink);
+  transition:background .2s ease, color .2s ease, box-shadow .2s ease; }
+.mbs-tt__day:hover b { background:rgba(0,0,0,.06); }
+.mbs-tt__day[aria-current="true"] b { background:var(--ink); color:#fff; font-weight:600; }
+.mbs-tt__day.is-today b { background:#FFD60A; color:#1D1D1F; font-weight:600; }
+.mbs-tt__day.is-today:hover b { background:#FFCC00; }
+.mbs-tt__day.is-today[aria-current="true"] b { box-shadow:0 0 0 2px var(--s), 0 0 0 3.5px #1D1D1F; }
 .mbs-tt__day .mbs-tt__mark { display:none; }
 
 /* Now is a card of its own, the one thing in the dock you read at a glance. */
