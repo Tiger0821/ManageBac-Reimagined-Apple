@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ManageBac Reimagined (Apple)
 // @namespace    https://github.com/Tiger0821/ManageBac-Reimagined-Apple
-// @version      2026.10.01.3
+// @version      2026.10.01.4
 // @description  ManageBac restyled after apple.com, with a three-tab switcher, a ⌘K class palette, today's timetable in a side dock with a living aquarium, and what's due today on the calendar.
 // @author       Arstoien, Tiger0821
 // @homepageURL  https://github.com/Tiger0821/ManageBac-Reimagined-Apple
@@ -762,8 +762,10 @@ html.mbs-docked.mbs-dock-loose body { padding-left:var(--dock) !important; }
 .mbs-tt__gap.is-now > span:not(.mbs-tt__left) { position:relative; z-index:1; }
 .mbs-tt__swipe { position:absolute; left:6px; top:4px; bottom:4px; background:var(--mark);
   pointer-events:none; z-index:0;
-  border-radius:12px; transition:width 700ms cubic-bezier(.4,0,.2,1); }
-.mbs-tt__swipe i { display:none; }
+  border-radius:12px 3px 3px 12px; transition:width 700ms cubic-bezier(.4,0,.2,1); }
+/* the leading edge: a solid blue line where the fill has got to, so "how far
+   through" reads at a glance rather than from the fill's soft colour alone */
+.mbs-tt__swipe i { position:absolute; right:0; top:0; bottom:0; width:3px; border-radius:0 3px 3px 0; background:var(--a); }
 .mbs-tt__left { position:absolute; right:16px; top:13px; z-index:1;
   font-size:12px; font-weight:600; color:var(--a); font-variant-numeric:tabular-nums; }
 .mbs-tt__none { padding:24px 16px; text-align:center; font-size:14px; color:var(--ink3); }
