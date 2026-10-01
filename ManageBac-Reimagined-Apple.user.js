@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ManageBac Reimagined (Apple)
 // @namespace    https://github.com/Tiger0821/ManageBac-Reimagined-Apple
-// @version      2026.10.01.1
+// @version      2026.10.01.2
 // @description  ManageBac restyled after apple.com, with a three-tab switcher, a ⌘K class palette, today's timetable in a side dock with a living aquarium, and what's due today on the calendar.
 // @author       Arstoien, Tiger0821
 // @homepageURL  https://github.com/Tiger0821/ManageBac-Reimagined-Apple
@@ -296,6 +296,23 @@ nav.navbar, nav.navbar.bg-white {
 .js-sidebar_guides,
 .f-sidebar-tabs__toggle[data-bs-target=".js-sidebar_guides"] { display:none !important; }
 .f-layout-main__sidebar.mbs-aside-empty { display:none !important; }
+/* ManageBac's link colour and hover underline were landing on the class
+   palette's rows, which turned the highlighted row's name the same colour as
+   the highlight. These outrank the global link rules. */
+.mbs-panel .mbs-list a.mbs-opt, .mbs-panel .mbs-list a.mbs-opt:hover { text-decoration:none !important; }
+.mbs-panel .mbs-list a.mbs-opt:hover { color:var(--ink) !important; }
+.mbs-panel .mbs-list a.mbs-opt.is-cursor, .mbs-panel .mbs-list a.mbs-opt.is-cursor:hover { color:#fff !important; }
+
+/* Moving between pages: the browser cross-fades the old page into the new
+   one instead of blanking to white, and the dock — the same on both sides —
+   is held still, the new one laid straight over the old, so it never seems
+   to leave. (Browsers without cross-page transitions just load as before.) */
+@view-transition { navigation: auto; }
+.mbs-dock { view-transition-name: mbs-dock; }
+::view-transition-old(mbs-dock), ::view-transition-new(mbs-dock) { animation:none; }
+::view-transition-group(mbs-dock) { animation-duration:0s; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration:.22s; }
+
 /* buttons the script takes away by their label (see hideButtons) */
 .mbs-gone { display:none !important; }
 
@@ -1731,9 +1748,22 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
 
     const keep = dockList && dockList.isConnected ? dockList.scrollTop : 0;
     const kids = [head, ruler, ttNowBar(), list, foot];
-    // the aquarium is decoration: if it fails, the timetable still draws
-    try { kids.unshift(ttClock()); } catch (err) { console.warn('[MBS]', err); }
+    // The aquarium is kept across redraws (a day picked, a period rolling
+    // over, the dock reopened): a fresh one started blank for a frame, which
+    // made the time flicker. It's also decoration — if it fails, the
+    // timetable still draws.
+    let clock = null;
+    try {
+      if (!aqClockEl || !aqClockEl._aq) aqClockEl = ttClock();
+      clock = aqClockEl;
+      kids.unshift(clock);
+    } catch (err) { console.warn('[MBS]', err); }
     dock.replaceChildren(...kids);
+    // drawn now rather than on the next frame, so it's never seen empty
+    if (clock) {
+      try { aqDraw(clock, REDUCED_MOTION.matches ? 0 : aqNow()); } catch (err) { console.warn('[MBS]', err); }
+      aqRun(clock);
+    }
     dockList = list;
     if (focus) ttFocus(list, live);
     else list.scrollTop = keep;
@@ -1751,7 +1781,33 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
   /* The water fills in from empty the first time the corner is drawn on a
      page; after that (a period rolling over rebuilds the dock) it is simply
      set, so it doesn't drain and refill every 45 minutes. */
-  let ttWaterShown = false;
+  let ttWaterShown = false, aqClockEl = null;
+
+  /* Moving to another page reloads it, and the aquarium with it, so it's
+     carried across: the waves keep their phases (timed off the wall clock,
+     they carry on from the same place), and the diver keeps what he was
+     doing, where, and for how much longer. The water fills in from empty
+     only on the first page of a visit. */
+  const AQ_KEY = 'mbs-aquarium';
+  const aqNow = () => (performance.timeOrigin + performance.now()) / 1000;
+  function aqSaved() {
+    try {
+      const s = JSON.parse(sessionStorage.getItem(AQ_KEY) || 'null');
+      return s && Date.now() - s.at < 10 * 60e3 ? s : null;
+    } catch (e) { return null; }
+  }
+  function aqSave() {
+    const aq = aqClockEl && aqClockEl._aq, k = aq && aq.kid;
+    if (!aq) return;
+    try {
+      sessionStorage.setItem(AQ_KEY, JSON.stringify({
+        at: Date.now(), phases: aq.phases,
+        kid: k && k.act ? { id: k.act.id, t0: k.t0, until: k.until, x: k.x, face: k.face, chest: k.chest } : null
+      }));
+    } catch (e) {}
+  }
+  addEventListener('pagehide', aqSave);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') aqSave(); });
   function ttClock() {
     const c = el('div', 'mbs-tt__clock');
     const cv = el('canvas', 'mbs-aq');
@@ -1773,7 +1829,12 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
       phases: AQ_LAYERS.map(L => L.waves.map(() => Math.random() * 6.2832)),
       swells: [], level: 0, target: 0, running: false
     };
-    const first = !ttWaterShown;
+    const saved = aqSaved();
+    if (saved && Array.isArray(saved.phases) && saved.phases.length === AQ_LAYERS.length) c._aq.phases = saved.phases;
+    c._aq.restore = saved && saved.kid;
+    let filled = false;
+    try { filled = sessionStorage.getItem('mbs-aq-filled') === '1'; sessionStorage.setItem('mbs-aq-filled', '1'); } catch (e) {}
+    const first = !ttWaterShown && !filled;
     ttClockSet(c, first);
     ttWaterShown = true;
     c._aq.level = first && !REDUCED_MOTION.matches ? 0 : c._aq.target;
@@ -1853,7 +1914,7 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
       const dt = Math.min(.1, (now - last) / 1000);
       last = now;
       aq.level += (aq.target - aq.level) * Math.min(1, dt * 2.2);
-      aqDraw(c, now / 1000);
+      aqDraw(c, (performance.timeOrigin + now) / 1000);
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
@@ -2176,8 +2237,16 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
      Returns where to draw him and whether he's out of the water (then the
      front wave is drawn over him, so he wades) or diving (drawn in front). */
   function kidStep(aq, t, dt, w, h, surface) {
-    const k = aq.kid || (aq.kid = { x: w * .55, face: 1, act: null, until: 0, t0: 0,
-                                     breath: t + 1, puffs: [], zs: [], steam: [], sparks: [], tz: 0, ts: 0 });
+    let k = aq.kid;
+    if (!k) {
+      k = aq.kid = { x: w * .55, face: 1, act: null, until: 0, t0: 0,
+                     breath: t + 1, puffs: [], zs: [], steam: [], sparks: [], tz: 0, ts: 0 };
+      // carry on from the last page: same activity, same spot, same time left
+      const r = aq.restore, act = r && KID_ACTS.find(a => a.id === r.id);
+      if (act && r.until > t) Object.assign(k, { act, t0: r.t0, until: r.until, face: r.face === -1 ? -1 : 1,
+                                                 x: Math.max(18, Math.min(w - 18, +r.x || k.x)), chest: r.chest });
+      aq.restore = null;
+    }
     const depth = h - surface, land = depth <= KID_WADE;
     const fits = a => land ? !!a.land : !a.land && depth >= a.deep;
     if (!k.act || t >= k.until || !fits(k.act)) kidPick(k, t, fits);
@@ -2326,7 +2395,7 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
   function ttSwell(kind) {
     const clock = dock && dock.isConnected && !dock.hidden && dock.querySelector('.mbs-tt__clock');
     if (!clock || !clock._aq || document.visibilityState !== 'visible' || REDUCED_MOTION.matches) return;
-    clock._aq.swells.push(Object.assign({ t0: performance.now() / 1000 }, AQ_SWELL[kind]));
+    clock._aq.swells.push(Object.assign({ t0: aqNow() }, AQ_SWELL[kind]));
   }
   ttWaveSchedule();
 
@@ -2393,6 +2462,29 @@ DP V. Arts~9~15:20~16:05~David Wang~6F-DP VA Studio`;
     }
   }
   setInterval(ttTick, 5000);
+
+  /* The tab title carries the block you're in as a progress bar, readable
+     from any tab: ten segments filling as it runs, what it is, and the
+     minutes left, then the page's own name. Outside the school day, and at
+     weekends, the title is ManageBac's own. */
+  let titleBase = null, titleSet = null;
+  function ttTitle() {
+    if (titleSet === null || document.title !== titleSet) titleBase = document.title;   // the page named itself
+    const col = ttToday(), t = ttNow();
+    const seg = col < 0 ? null : ttLine(ttWeek(new Date()), col).find(x => t >= x.s && t < x.e);
+    if (!seg) {
+      if (titleSet !== null && document.title === titleSet) document.title = titleBase;
+      titleSet = null;
+      return;
+    }
+    const n = Math.round(Math.max(0, Math.min(1, (t - seg.s) / (seg.e - seg.s))) * 10);
+    const what = seg.gap || seg.slot.items.map(l => ttName(l.subject)).join(' / ');
+    const page = (titleBase || '').replace(/^ManageBac\s*\|\s*/, '');
+    titleSet = `${'\u25B0'.repeat(n)}${'\u25B1'.repeat(10 - n)} ${what} \u00B7 ${Math.ceil(seg.e - t)}m` + (page ? ` \u2014 ${page}` : '');
+    document.title = titleSet;
+  }
+  setInterval(ttTitle, 5000);
+  document.addEventListener('DOMContentLoaded', ttTitle);
   // a background tab's timers are throttled, so catch up the moment it's back
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ttTick(); });
 
